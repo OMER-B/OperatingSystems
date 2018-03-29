@@ -1,7 +1,4 @@
 #!/bin/bash
-#omer barak
-#313264053
-#barakom
 if [[ $# > 1 ]]; then
 	echo "error: only one argument is allowed"
 	exit 1

@@ -1,7 +1,4 @@
 #!/bin/bash
-#omer barak
-#313264053
-#barakom
 if [ -f "$1"/*.txt ]; then
 	COUNT=$(find "$1"/*.txt | wc -l)
 else

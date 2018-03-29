@@ -1,7 +1,4 @@
 #!/bin/bash
-#omer barak
-#313264053
-#barakom
 for file in "$1"/*
 do
 	if [[ -d $file ]]; then
