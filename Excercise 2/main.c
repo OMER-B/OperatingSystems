@@ -11,6 +11,7 @@
 #define DELIMITER " "
 
 char **parse_line(char *);
+
 char *get_line();
 
 typedef enum STATE {
@@ -30,18 +31,28 @@ typedef struct job_t {
 } job_t;
 
 void kill_all(struct job_t *jobs);
+
 void remove_job(struct job_t *, pid_t);
+
 void add_job(struct job_t *, pid_t, int, STATE, char *);
+
 struct job_t *job_by_pid(struct job_t *, pid_t);
 
 /* Commands */
 BOOL execute(char **, struct job_t *);
+
 BOOL start_foreground(char **, struct job_t *);
-BOOL start_background(char **, job_t *);
+
+BOOL start_background(char **, struct job_t *);
+
 BOOL cd(char **, struct job_t *);
+
 BOOL help(char **, struct job_t *);
+
 BOOL shell_exit(char **, struct job_t *);
+
 BOOL list_jobs(char **, struct job_t *);
+
 BOOL check_ampersand(char **);
 
 /* Implementations */
@@ -69,7 +80,7 @@ int main() {
 char *get_line() {
     size_t buffer_size = BUFFER_SIZE;
     int position = 0, c;
-    char *line = malloc(sizeof(char) * buffer_size);
+    char *line = calloc(sizeof(char), buffer_size);
 
     // First allocation for line size
     if (!line) {
@@ -102,7 +113,7 @@ char *get_line() {
 char **parse_line(char *line) {
     size_t buffer_size = BUFFER_SIZE;
     int position = 0;
-    char **tokens = malloc(sizeof(char *) * buffer_size);
+    char **tokens = calloc(sizeof(char *), buffer_size);
     char *token;
 
     if (!tokens) {
@@ -110,7 +121,7 @@ char **parse_line(char *line) {
         exit(0);
     }
 
-    token = strtok(line, delimiter);
+    token = strtok(line, DELIMITER);
     while (token != NULL) {
         tokens[position] = token;
         position++;
@@ -159,14 +170,20 @@ BOOL execute(char **input, job_t *jobs) {
             return (*func[i])(input, jobs);
         }
     }
-    return (ampersand == TRUE ? start_background : start_foreground)(input, jobs);
+    if (ampersand == TRUE) {
+        int j = 0;
+        for (; input[j] != NULL; j++);
+        input[j - 1] = '\0';
+        return start_background(input, jobs);
+    } else {
+        return start_foreground(input, jobs);
+    }
 }
-
 
 inline BOOL check_ampersand(char **input) {
     int i = 0;
-    while (input[i] != NULL, i++);
-    return !strcmp(input[--i], "&") ? TRUE : FALSE;
+    for (; input[i] != NULL; i++);
+    return !strcmp(input[i - 1], "&") ? TRUE : FALSE;
 }
 
 BOOL start_background(char **input, job_t *jobs) {
@@ -212,7 +229,7 @@ BOOL start_foreground(char **input, job_t *jobs) {
         do {
             add_job(jobs, pid, 0, FOREGROUND, input[0]);
             wpid = waitpid(pid, &status, WUNTRACED);
-            remove_job(jobs, pid);
+//            remove_job(jobs, pid);
         } while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
     }
@@ -276,3 +293,4 @@ void remove_job(struct job_t *jobs, pid_t pid) {
 
 void kill_all(struct job_t *jobs) {
 }
+
