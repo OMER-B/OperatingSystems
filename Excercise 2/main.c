@@ -19,6 +19,7 @@ typedef enum bool {
 } bool;
 
 char **parse_line(char *);
+
 char *get_line();
 
 /* Jobs handling */
@@ -30,17 +31,26 @@ typedef struct job_t {
 } job_t;
 
 void kill_all(struct job_t **jobs);
+
 void remove_job(struct job_t **, pid_t);
+
 void add_job(struct job_t **, pid_t, int, state, char **);
+
 struct job_t *job_by_pid(struct job_t *, pid_t);
 
 /* Commands */
 bool execute(char **, struct job_t **);
+
 bool start(char **, struct job_t **);
+
 bool cd(char **, struct job_t **);
+
 bool help(char **, struct job_t **);
+
 bool shell_exit(char **, struct job_t **);
+
 bool list_jobs(char **, struct job_t **);
+
 bool check_ampersand(char **);
 
 /* Implementations */
@@ -208,23 +218,38 @@ void add_job(struct job_t **jobs, pid_t pid, int jid, state state, char **cmd) {
 }
 
 bool cd(char **args, struct job_t **jobs) {
+    // If we write no path (only 'cd'), then go to the home directory
     if (args[1] == NULL) {
-        printf("to which folder?\n");
-    } else {
-        if (chdir(args[1]) != 0) {
-            return false;
+        chdir(getenv("HOME"));
+        return true;
+    }
+        // Else we change the directory to the one specified by the
+        // argument, if possible
+    else {
+        if (chdir(args[1]) == -1) {
+            printf(" %s: no such directory\n", args[1]);
+            return true;
         }
     }
     return true;
 }
 
 bool help(char **args, struct job_t **jobs) {
-    printf("no help.\n");
+    printf("***************************************************\n"
+           "***************************************************\n"
+           "****                                           ****\n"
+           "****                OMER BARAK                 ****\n"
+           "****                                           ****\n"
+           "****             Operating Systems             ****\n"
+           "****                Exercise 2                 ****\n"
+           "****                                           ****\n"
+           "***************************************************\n"
+           "***************************************************");
     return true;
 }
 
 bool shell_exit(char **args, struct job_t **jobs) {
-    kill_all(jobs);
+//    kill_all(jobs);
     return false;
 }
 
