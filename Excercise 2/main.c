@@ -10,60 +10,48 @@
 #define PROMPT "> "
 #define DELIMITER " "
 
-typedef enum STATE {
-    FOREGROUND, BACKGROUND, STOPPED
-} STATE;
+typedef enum state {
+    fg, bg, STOPPED
+} state;
 
-typedef enum BOOL {
-    FALSE, TRUE
-} BOOL;
+typedef enum bool {
+    false, true
+} bool;
 
 char **parse_line(char *);
-
 char *get_line();
 
 /* Jobs handling */
 typedef struct job_t {
     pid_t pid;      /* PID of the job */
     int jid;        /* ID of the job */
-    STATE state;    /* state of the job */
+    state state;    /* state of the job */
     char **cmd;      /* command to print */
 } job_t;
 
 void kill_all(struct job_t **jobs);
-
 void remove_job(struct job_t **, pid_t);
-
-void add_job(struct job_t **, pid_t, int, STATE, char **);
-
+void add_job(struct job_t **, pid_t, int, state, char **);
 struct job_t *job_by_pid(struct job_t *, pid_t);
 
 /* Commands */
-BOOL execute(char **, struct job_t **);
-
-BOOL start_foreground(char **, struct job_t **);
-
-BOOL start_background(char **, struct job_t **);
-
-BOOL cd(char **, struct job_t **);
-
-BOOL help(char **, struct job_t **);
-
-BOOL shell_exit(char **, struct job_t **);
-
-BOOL list_jobs(char **, struct job_t **);
-
-BOOL check_ampersand(char **);
+bool execute(char **, struct job_t **);
+bool start(char **, struct job_t **);
+bool cd(char **, struct job_t **);
+bool help(char **, struct job_t **);
+bool shell_exit(char **, struct job_t **);
+bool list_jobs(char **, struct job_t **);
+bool check_ampersand(char **);
 
 /* Implementations */
 int main() {
-    BOOL status = TRUE;
+    bool status = true;
     char *line;
     char **input;
-    job_t *jobs[MAX_JOBS];
+    job_t **jobs = (void *) calloc(MAX_JOBS, sizeof(struct job_t));
     bzero(jobs, MAX_JOBS * sizeof(job_t *)); /* Initalize to all-zeros */
 
-    while (status == TRUE) {
+    while (status == true) {
         printf(PROMPT);
         line = get_line();
         input = parse_line(line);
@@ -139,108 +127,71 @@ char **parse_line(char *line) {
     return tokens;
 }
 
-BOOL (*func[])(char **input, job_t **jobs) = {
+bool (*func[])(char **input, job_t **jobs) = {
         &cd,
         &help,
         &list_jobs,
         &shell_exit
 };
 
-BOOL execute(char **input, job_t **jobs) {
-    if (input[0] == NULL) { /* Empty command. ask for another. */
-        return TRUE;
-    }
+bool execute(char **input, job_t **jobs) {
+    if (input[0] == NULL) { return true; } /* Empty command. ask for another. */
 
     int i, size;
-    BOOL ampersand;
+    bool ampersand;
 
-    char *commands[] = {
-            "cd",
-            "help",
-            "jobs",
-            "exit"
-    };
+    char *commands[] = {"cd", "help", "jobs", "exit"};
     size = sizeof(commands) / sizeof(char *);
-
-    ampersand = check_ampersand(input);
 
     for (i = 0; i < size; i++) {
         if (!strcmp(input[0], commands[i])) {
             return (*func[i])(input, jobs);
         }
     }
-    if (ampersand == TRUE) {
+
+    return start(input, jobs);
+}
+
+inline bool check_ampersand(char **input) {
+    int i = 0;
+    for (; input[i] != NULL; i++);
+    return !strcmp(input[i - 1], "&") ? true : false;
+}
+
+bool start(char **input, job_t **jobs) {
+    int status = 0;
+    pid_t pid;
+    bool ampersand;
+
+    ampersand = check_ampersand(input);
+    if (ampersand == true) {
         int j = 0;
         for (; input[j] != NULL; j++);
         input[j - 1] = '\0';
-        return start_background(input, jobs);
-    } else {
-        return start_foreground(input, jobs);
     }
-}
-
-inline BOOL check_ampersand(char **input) {
-    int i = 0;
-    for (; input[i] != NULL; i++);
-    return !strcmp(input[i - 1], "&") ? TRUE : FALSE;
-}
-
-BOOL start_background(char **input, job_t **jobs) {
-    int status = 0;
-    pid_t pid, wpid;
 
     pid = fork();
 
-    if (pid == 0) {
-        if (execvp(input[0], input) == -1) {
-            perror("ERROR");
-        }
-        return FALSE;
+    if (pid > 0) { /* Forking successful, pid is child id. */
+        printf("%d\n", pid);
+    } else if (pid == 0) { /* */ //TODO what is here? failure?
+        execvp(input[0], input);
+        fprintf(stderr, "execution error\n");
     } else if (pid < 0) {
-        perror("ERROR\n");
-    } else {
-        do {
-            add_job(jobs, getpid(), 0, BACKGROUND, input);
-            wpid = waitpid(pid, &status, WNOHANG);
-            printf("%d\n", getpid());
-//            remove_job(jobs, pid);
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-
+        perror("Forking unsuccessful\n");
+        return false;
     }
-    return TRUE;
+    if (ampersand == false && pid != 0) {
+        waitpid(pid, NULL, 0);
+    }
+    return true;
 }
 
-BOOL start_foreground(char **input, job_t **jobs) {
-    pid_t pid, wpid;
-    int status = 0;
-
-    pid = fork();
-
-    if (pid == 0) {
-        if (execvp(input[0], input) == -1) {
-            perror("ERROR");
-        }
-        return FALSE;
-    } else if (pid < 0) {
-        perror("ERROR\n");
-    } else {
-        printf("%d\n", getpid());
-        do {
-            add_job(jobs, getpid(), 0, FOREGROUND, input);
-            wpid = waitpid(pid, &status, WUNTRACED);
-//            remove_job(jobs, pid);
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-
-    }
-    return TRUE;
-}
-
-void add_job(struct job_t **jobs, pid_t pid, int jid, STATE state, char **cmd) {
+void add_job(struct job_t **jobs, pid_t pid, int jid, state state, char **cmd) {
     int i = 0, j = 0;
     size_t size = 0;
     for (i = 0; i < MAX_JOBS; i++) {
-        if (jobs[i]->pid == 0) {
-            printf("true\n");
+        if (jobs[i] == NULL) {
             jobs[i]->pid = pid;
             jobs[i]->jid = jid;
             jobs[i]->state = state;
@@ -256,28 +207,28 @@ void add_job(struct job_t **jobs, pid_t pid, int jid, STATE state, char **cmd) {
     }
 }
 
-BOOL cd(char **args, struct job_t **jobs) {
+bool cd(char **args, struct job_t **jobs) {
     if (args[1] == NULL) {
         printf("to which folder?\n");
     } else {
         if (chdir(args[1]) != 0) {
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
-BOOL help(char **args, struct job_t **jobs) {
+bool help(char **args, struct job_t **jobs) {
     printf("no help.\n");
-    return TRUE;
+    return true;
 }
 
-BOOL shell_exit(char **args, struct job_t **jobs) {
+bool shell_exit(char **args, struct job_t **jobs) {
     kill_all(jobs);
-    return FALSE;
+    return false;
 }
 
-BOOL list_jobs(char **args, struct job_t **jobs) {
+bool list_jobs(char **args, struct job_t **jobs) {
     int i;
     for (i = 0; i < MAX_JOBS; i++) {
         if (jobs[i]->pid != 0) {
@@ -285,7 +236,7 @@ BOOL list_jobs(char **args, struct job_t **jobs) {
             printf("%s\n", jobs[i]->cmd[0]);
         }
     }
-    return TRUE;
+    return true;
 }
 
 void remove_job(struct job_t **jobs, pid_t pid) {
