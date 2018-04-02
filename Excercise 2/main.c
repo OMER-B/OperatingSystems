@@ -10,16 +10,10 @@
 #define PROMPT "> "
 #define DELIMITER " "
 
-typedef enum state {
-    foreground, background
-} state;
-
-typedef enum bool {
-    false, true
-} bool;
+typedef enum state { foreground, background } state;
+typedef enum bool { false, true } bool;
 
 char **parse_line(char *);
-
 char *get_line();
 
 /* Jobs handling */
@@ -28,32 +22,27 @@ typedef struct job_t {
     int jid;        /* ID of the job */
     state state;    /* state of the job */
     char **cmd;     /* command to print */
-} job_t;
+};
 
 void kill_all(struct job_t *);
-
 void remove_job(struct job_t *, pid_t);
-
 void add_job(struct job_t *, pid_t, int, state, char **);
-
 struct job_t *job_by_pid(struct job_t *, pid_t);
 
 /* Commands */
 bool execute(char **, struct job_t *);
-
 bool start(char **, struct job_t *);
-
 bool cd(char **, struct job_t *);
-
 bool help(char **, struct job_t *);
-
 bool shell_exit(char **, struct job_t *);
-
 bool list_jobs(char **, struct job_t *);
-
 state check_ampersand(char **);
 
 /* Implementations */
+/**
+ * Main
+ * @return 0
+ */
 int main() {
     bool status = true;
     char *line;
@@ -63,7 +52,7 @@ int main() {
         printf("Allocation failure.\n");
         exit(0);
     }
-    bzero(jobs, MAX_JOBS * sizeof(job_t *)); /* Initalize to all-zeros */
+    bzero(jobs, MAX_JOBS * sizeof(struct job_t *)); /* Initalize to all-zeros */
 
     while (status == true) {
         printf(PROMPT);
@@ -78,6 +67,10 @@ int main() {
     return 0;
 }
 
+/**
+ * Gets line input from user.
+ * @return line input of user.
+ */
 char *get_line() {
     size_t buffer_size = BUFFER_SIZE;
     int position = 0, c;
@@ -108,6 +101,11 @@ char *get_line() {
     }
 }
 
+/**
+ * Separates line input to array of strings.
+ * @param line input from user.
+ * @return array of strings.
+ */
 char **parse_line(char *line) {
     size_t buffer_size = BUFFER_SIZE;
     int position = 0;
@@ -135,14 +133,26 @@ char **parse_line(char *line) {
     return tokens;
 }
 
-bool (*func[])(char **input, job_t *jobs) = {
+/**
+ * Function pointer for cleaner code.
+ * @param input array of command arguments.
+ * @param jobs array of jobs.
+ * @return true if success, false if fail.
+ */
+bool (*func[])(char **input, struct job_t *jobs) = {
         &cd,
         &help,
         &list_jobs,
         &shell_exit
 };
 
-bool execute(char **input, job_t *jobs) {
+/**
+ * Executes the custom functions and calls start to execute execvp.
+ * @param input array of command arguments.
+ * @param jobs array of jobs.
+ * @return true if success, false if fail.
+ */
+bool execute(char **input, struct job_t *jobs) {
     if (input[0] == NULL) { return true; } /* Empty command. ask for another. */
     int i, size;
     char *commands[] = {"cd", "help", "jobs", "exit"};
@@ -155,13 +165,24 @@ bool execute(char **input, job_t *jobs) {
     return start(input, jobs);
 }
 
+/**
+ * Checks if command should be foreground of background by ampersand.
+ * @param input array of command arguments.
+ * @return background if command has ampersand, foreground otherwise.
+ */
 inline state check_ampersand(char **input) {
     register int i = 0;
     for (; input[i] != NULL; i++); /* Find last cell of the array to check if it is ampersand */
     return !strcmp(input[i - 1], "&") ? background : foreground;
 }
 
-bool start(char **input, job_t *jobs) {
+/**
+ * Forks and executes a command with execvp.
+ * @param input array of command arguments.
+ * @param jobs array of jobs.
+ * @return true if success, false if fail.
+ */
+bool start(char **input, struct job_t *jobs) {
     register int i = 0;
     pid_t pid;
     state ampersand;
@@ -191,6 +212,12 @@ bool start(char **input, job_t *jobs) {
     return true;
 }
 
+/**
+ * Change directory command.
+ * @param input array of command arguments.
+ * @param jobs array of jobs.
+ * @return true if success, false if fail.
+ */
 bool cd(char **args, struct job_t *jobs) {
     if (args[1] == NULL) {
         chdir(getenv("home"));
@@ -204,6 +231,12 @@ bool cd(char **args, struct job_t *jobs) {
     return true;
 }
 
+/**
+ * Help command.
+ * @param input array of command arguments.
+ * @param jobs array of jobs.
+ * @return true if success, false if fail.
+ */
 bool help(char **args, struct job_t *jobs) {
     printf("***************************************************\n"
                    "***************************************************\n"
@@ -218,11 +251,23 @@ bool help(char **args, struct job_t *jobs) {
     return true;
 }
 
+/**
+ * Exit command.
+ * @param input array of command arguments.
+ * @param jobs array of jobs.
+ * @return true if success, false if fail.
+ */
 bool shell_exit(char **args, struct job_t *jobs) {
 //    kill_all(jobs);
     return false;
 }
 
+/**
+ * Jobs command.
+ * @param input array of command arguments.
+ * @param jobs array of jobs.
+ * @return true if success, false if fail.
+ */
 bool list_jobs(char **args, struct job_t *jobs) {
     register int i;
     for (i = 0; i < MAX_JOBS; i++) {
@@ -234,6 +279,14 @@ bool list_jobs(char **args, struct job_t *jobs) {
     return true;
 }
 
+/**
+ * Adds a job to the list of jobs.
+ * @param jobs array of jobs.
+ * @param pid pid of the job.
+ * @param jid jid of the job.
+ * @param state state of the job, foreground or background.
+ * @param cmd commandline argument of the job.
+ */
 void add_job(struct job_t *jobs, pid_t pid, int jid, state state, char **cmd) {
     int i;
     register int j;
@@ -255,16 +308,25 @@ void add_job(struct job_t *jobs, pid_t pid, int jid, state state, char **cmd) {
     }
 }
 
+/**
+ * Removes job from the list by pid.
+ * @param jobs array of jobs.
+ * @param pid pid of job to remove.
+ */
 void remove_job(struct job_t *jobs, pid_t pid) {
     register int i;
     for (i = 0; i < MAX_JOBS; i++) {
         if (jobs[i].pid == pid) {
             free(jobs[i].cmd);
-            memset(&jobs[i], '\0', sizeof(job_t));
+            memset(&jobs[i], '\0', sizeof(struct job_t));
         }
     }
 }
 
+/**
+ * Kills all jobs
+ * @param jobs array of jobs to kill.
+ */
 void kill_all(struct job_t *jobs) {
     register int i;
     for (i = 0; i < MAX_JOBS; i++) {
