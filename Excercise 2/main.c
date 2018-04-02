@@ -11,7 +11,7 @@
 #define DELIMITER " "
 
 typedef enum state {
-    fg, bg, STOPPED
+    foreground, background
 } state;
 
 typedef enum bool {
@@ -51,7 +51,7 @@ bool shell_exit(char **, struct job_t *);
 
 bool list_jobs(char **, struct job_t *);
 
-bool check_ampersand(char **);
+state check_ampersand(char **);
 
 /* Implementations */
 int main() {
@@ -150,18 +150,18 @@ bool execute(char **input, job_t *jobs) {
     return start(input, jobs);
 }
 
-inline bool check_ampersand(char **input) {
+inline state check_ampersand(char **input) {
     register int i = 0;
     for (; input[i] != NULL; i++);
-    return !strcmp(input[i - 1], "&") ? true : false;
+    return !strcmp(input[i - 1], "&") ? background : foreground;
 }
 
 bool start(char **input, job_t *jobs) {
     int status = 0;
     pid_t pid;
-    bool ampersand;
+    state ampersand;
     ampersand = check_ampersand(input);
-    if (ampersand == true) {
+    if (ampersand == background) { /* replace & with \0 */
         int j = 0;
         for (; input[j] != NULL; j++);
         input[j - 1] = '\0';
@@ -171,7 +171,7 @@ bool start(char **input, job_t *jobs) {
 
     if (pid > 0) { /* Forking successful, pid is child id. */
         printf("%d\n", pid);
-        add_job(jobs, pid, 0, fg, input);
+        add_job(jobs, pid, 0, ampersand, input);
     } else if (pid == 0) {
         //TODO split to functions and do jobs
         int i, size;
@@ -183,14 +183,14 @@ bool start(char **input, job_t *jobs) {
                 return (*func[i])(input, jobs);
             }
         }
-        printf("pid: %d", pid);
         execvp(input[0], input);
+//        remove_job(jobs, pid); //TODO find correct place to remove job
         fprintf(stderr, "Execution error\n");
     } else if (pid < 0) {
         perror("Forking unsuccessful\n");
         return false;
     }
-    if (ampersand == false && pid != 0) {
+    if (ampersand == foreground && pid != 0) {
         waitpid(pid, NULL, 0);
         remove_job(jobs, pid); //TODO find correct place to remove job
     }
@@ -211,7 +211,7 @@ void add_job(struct job_t *jobs, pid_t pid, int jid, state state, char **cmd) {
                 }
             }
             jobs[i].cmd = calloc(size, sizeof(char));
-            strcpy(jobs[i].cmd, cmd);
+            memcpy(jobs[i].cmd, cmd, sizeof(char) * size);
             break;
         }
     }
