@@ -27,7 +27,7 @@ typedef struct job_t {
     pid_t pid;      /* PID of the job */
     int jid;        /* ID of the job */
     state state;    /* state of the job */
-    char **cmd;      /* command to print */
+    char **cmd;     /* command to print */
 } job_t;
 
 void kill_all(struct job_t *);
@@ -58,7 +58,11 @@ int main() {
     bool status = true;
     char *line;
     char **input;
-    job_t *jobs = (void *) calloc(MAX_JOBS, sizeof(struct job_t));
+    struct job_t *jobs = (struct job_t *) calloc(MAX_JOBS, sizeof(struct job_t));
+    if (!jobs) {
+        printf("Allocation failure.\n");
+        exit(0);
+    }
     bzero(jobs, MAX_JOBS * sizeof(job_t *)); /* Initalize to all-zeros */
 
     while (status == true) {
@@ -77,9 +81,8 @@ int main() {
 char *get_line() {
     size_t buffer_size = BUFFER_SIZE;
     int position = 0, c;
-    char *line = calloc(sizeof(char), buffer_size);
+    char *line = (char *) calloc(buffer_size, sizeof(char)); /* First allocation for MAX_SIZE */
 
-    // First allocation for line size
     if (!line) {
         printf("Allocation failure.\n");
         exit(0);
@@ -91,14 +94,12 @@ char *get_line() {
             line[position] = '\0';
             return line;
         } else {
-            line[position] = c;
+            line[position] = (char) c;
         }
         position++;
-
         if (position >= buffer_size) { /* Reached end of buffer, need to allocate more */
             buffer_size += BUFFER_SIZE;
-            line = realloc(line, buffer_size * sizeof(char));
-
+            line = (char *) realloc(line, buffer_size * sizeof(char));
             if (!line) {
                 printf("Allocation failure.\n");
                 exit(0);
@@ -110,9 +111,8 @@ char *get_line() {
 char **parse_line(char *line) {
     size_t buffer_size = BUFFER_SIZE;
     int position = 0;
-    char **tokens = calloc(sizeof(char *), buffer_size);
     char *token;
-
+    char **tokens = (char **) calloc(buffer_size, sizeof(char *));
     if (!tokens) {
         printf("Allocation failure.\n");
         exit(0);
@@ -124,13 +124,11 @@ char **parse_line(char *line) {
         position++;
         if (position >= buffer_size) {
             buffer_size += BUFFER_SIZE;
-            tokens = realloc(tokens, buffer_size * sizeof(char));
-
+            tokens = (char **) realloc(tokens, buffer_size * sizeof(char));
             if (!tokens) {
                 printf("Allocation failure.\n");
                 exit(0);
             }
-
         }
         token = strtok(NULL, DELIMITER);
     }
@@ -146,25 +144,31 @@ bool (*func[])(char **input, job_t *jobs) = {
 
 bool execute(char **input, job_t *jobs) {
     if (input[0] == NULL) { return true; } /* Empty command. ask for another. */
-    //TODO currently useless function
+    int i, size;
+    char *commands[] = {"cd", "help", "jobs", "exit"};
+    size = sizeof(commands) / sizeof(char *);
+    for (i = 0; i < size; i++) {
+        if (!strcmp(input[0], commands[i])) {
+            return (*func[i])(input, jobs);
+        }
+    }
     return start(input, jobs);
 }
 
 inline state check_ampersand(char **input) {
     register int i = 0;
-    for (; input[i] != NULL; i++);
+    for (; input[i] != NULL; i++); /* Find last cell of the array to check if it is ampersand */
     return !strcmp(input[i - 1], "&") ? background : foreground;
 }
 
 bool start(char **input, job_t *jobs) {
-    int status = 0;
+    register int i = 0;
     pid_t pid;
     state ampersand;
     ampersand = check_ampersand(input);
-    if (ampersand == background) { /* replace & with \0 */
-        int j = 0;
-        for (; input[j] != NULL; j++);
-        input[j - 1] = '\0';
+    if (ampersand == background) { /* Replace '&' with '\0' */
+        for (; input[i] != NULL; i++);
+        input[i - 1] = '\0';
     }
 
     pid = fork();
@@ -173,16 +177,6 @@ bool start(char **input, job_t *jobs) {
         printf("%d\n", pid);
         add_job(jobs, pid, 0, ampersand, input);
     } else if (pid == 0) {
-        //TODO split to functions and do jobs
-        int i, size;
-        char *commands[] = {"cd", "help", "jobs", "exit"};
-        size = sizeof(commands) / sizeof(char *);
-
-        for (i = 0; i < size; i++) {
-            if (!strcmp(input[0], commands[i])) {
-                return (*func[i])(input, jobs);
-            }
-        }
         execvp(input[0], input);
 //        remove_job(jobs, pid); //TODO find correct place to remove job
         fprintf(stderr, "Execution error\n");
@@ -192,38 +186,18 @@ bool start(char **input, job_t *jobs) {
     }
     if (ampersand == foreground && pid != 0) {
         waitpid(pid, NULL, 0);
-        remove_job(jobs, pid); //TODO find correct place to remove job
+        remove_job(jobs, pid); //TODO find correct place to remove job (this place is good for foregrounds)
     }
     return true;
 }
 
-void add_job(struct job_t *jobs, pid_t pid, int jid, state state, char **cmd) {
-    int i = 0, j = 0;
-    size_t size = 0;
-    for (i = 0; i < MAX_JOBS; i++) {
-        if (jobs[i].pid == 0) {
-            jobs[i].pid = pid;
-            jobs[i].jid = jid;
-            jobs[i].state = state;
-            for (j = 0; cmd[j] != NULL; j++) {
-                for (int k = 0; cmd[j][k] != '\0'; k++) {
-                    size++; /* find how much to allocate */
-                }
-            }
-            jobs[i].cmd = calloc(size, sizeof(char));
-            memcpy(jobs[i].cmd, cmd, sizeof(char) * size);
-            break;
-        }
-    }
-}
-
 bool cd(char **args, struct job_t *jobs) {
     if (args[1] == NULL) {
-        chdir(getenv("HOME"));
+        chdir(getenv("home"));
         return true;
     } else {
         if (chdir(args[1]) == -1) {
-            printf("no such directory\n");
+            printf("%s: No such directory.\n", args[1]);
             return true;
         }
     }
@@ -240,7 +214,7 @@ bool help(char **args, struct job_t *jobs) {
                    "****                Exercise 2                 ****\n"
                    "****                                           ****\n"
                    "***************************************************\n"
-                   "***************************************************");
+                   "***************************************************\n");
     return true;
 }
 
@@ -250,18 +224,39 @@ bool shell_exit(char **args, struct job_t *jobs) {
 }
 
 bool list_jobs(char **args, struct job_t *jobs) {
-    int i;
+    register int i;
     for (i = 0; i < MAX_JOBS; i++) {
         if (jobs[i].pid != 0) {
-            printf("%d\t\t", jobs[i].pid);
-            printf("%s\n", jobs[i].cmd[0]);
+            printf("%d\t\t%s\n", jobs[i].pid, jobs[i].cmd[0]);
+            //TODO currently only print the name of the command without arguments
         }
     }
     return true;
 }
 
-void remove_job(struct job_t *jobs, pid_t pid) {
+void add_job(struct job_t *jobs, pid_t pid, int jid, state state, char **cmd) {
     int i;
+    register int j;
+    size_t size = 0;
+    for (i = 0; i < MAX_JOBS; i++) {
+        if (jobs[i].pid == 0) {
+            jobs[i].pid = pid;
+            jobs[i].jid = jid;
+            jobs[i].state = state;
+            for (j = 0; cmd[j] != NULL; j++) {
+                for (int k = 0; cmd[j][k] != '\0'; k++) {
+                    size++; /* Find how much to allocate */
+                }
+            }
+            jobs[i].cmd = calloc(size, sizeof(char));
+            memcpy(jobs[i].cmd, cmd, sizeof(char) * size);
+            break;
+        }
+    }
+}
+
+void remove_job(struct job_t *jobs, pid_t pid) {
+    register int i;
     for (i = 0; i < MAX_JOBS; i++) {
         if (jobs[i].pid == pid) {
             free(jobs[i].cmd);
@@ -271,7 +266,8 @@ void remove_job(struct job_t *jobs, pid_t pid) {
 }
 
 void kill_all(struct job_t *jobs) {
-    for (int i = 0; i < MAX_JOBS; i++) {
+    register int i;
+    for (i = 0; i < MAX_JOBS; i++) {
         if (jobs[i].cmd != NULL) {
             free(jobs[i].cmd);
         }
