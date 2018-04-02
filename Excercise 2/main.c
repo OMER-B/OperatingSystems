@@ -220,7 +220,7 @@ bool start(char **input, struct job_t *jobs) {
  */
 bool cd(char **args, struct job_t *jobs) {
     if (args[1] == NULL) {
-        chdir(getenv("home"));
+        chdir(getenv("HOME"));
         return true;
     } else {
         if (chdir(args[1]) == -1) {
