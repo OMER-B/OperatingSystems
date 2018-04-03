@@ -10,32 +10,47 @@
 #define PROMPT "> "
 #define DELIMITER " "
 
-typedef enum state { foreground, background } state;
-typedef enum bool { false, true } bool;
+typedef enum state {
+    foreground, background
+} state;
+typedef enum bool {
+    false, true
+} bool;
 
 char **parse_line(char *);
+
 char *get_line();
 
 /* Jobs handling */
-typedef struct job_t {
+struct job_t {
     pid_t pid;      /* PID of the job */
     int jid;        /* ID of the job */
     state state;    /* state of the job */
     char **cmd;     /* command to print */
+    char *line;
 };
 
 void kill_all(struct job_t *);
+
 void remove_job(struct job_t *, pid_t);
-void add_job(struct job_t *, pid_t, int, state, char **);
+
+void add_job(struct job_t *, pid_t, char *, state, char **);
+
 struct job_t *job_by_pid(struct job_t *, pid_t);
 
 /* Commands */
-bool execute(char **, struct job_t *);
-bool start(char **, struct job_t *);
+bool execute(char *, char **, struct job_t *);
+
+bool start(char *, char **, struct job_t *);
+
 bool cd(char **, struct job_t *);
+
 bool help(char **, struct job_t *);
+
 bool shell_exit(char **, struct job_t *);
+
 bool list_jobs(char **, struct job_t *);
+
 state check_ampersand(char **);
 
 /* Implementations */
@@ -58,12 +73,11 @@ int main() {
         printf(PROMPT);
         line = get_line();
         input = parse_line(line);
-
-        status = execute(input, jobs);
-
-//        free(line);
-//        free(input);
+        status = execute(line, input, jobs);
     }
+    free(line);
+    free(input);
+    free(jobs);
     return 0;
 }
 
@@ -73,7 +87,8 @@ int main() {
  */
 char *get_line() {
     size_t buffer_size = BUFFER_SIZE;
-    int position = 0, c;
+    unsigned int position = 0;
+    int c;
     char *line = (char *) calloc(buffer_size, sizeof(char)); /* First allocation for MAX_SIZE */
 
     if (!line) {
@@ -108,7 +123,7 @@ char *get_line() {
  */
 char **parse_line(char *line) {
     size_t buffer_size = BUFFER_SIZE;
-    int position = 0;
+    unsigned int position = 0;
     char *token;
     char **tokens = (char **) calloc(buffer_size, sizeof(char *));
     if (!tokens) {
@@ -152,7 +167,7 @@ bool (*func[])(char **input, struct job_t *jobs) = {
  * @param jobs array of jobs.
  * @return true if success, false if fail.
  */
-bool execute(char **input, struct job_t *jobs) {
+bool execute(char *line, char **input, struct job_t *jobs) {
     if (input[0] == NULL) { return true; } /* Empty command. ask for another. */
     int i, size;
     char *commands[] = {"cd", "help", "jobs", "exit"};
@@ -162,7 +177,7 @@ bool execute(char **input, struct job_t *jobs) {
             return (*func[i])(input, jobs);
         }
     }
-    return start(input, jobs);
+    return start(line, input, jobs);
 }
 
 /**
@@ -182,7 +197,7 @@ inline state check_ampersand(char **input) {
  * @param jobs array of jobs.
  * @return true if success, false if fail.
  */
-bool start(char **input, struct job_t *jobs) {
+bool start(char *line, char **input, struct job_t *jobs) {
     register int i = 0;
     pid_t pid;
     state ampersand;
@@ -196,10 +211,9 @@ bool start(char **input, struct job_t *jobs) {
 
     if (pid > 0) { /* Forking successful, pid is child id. */
         printf("%d\n", pid);
-        add_job(jobs, pid, 0, ampersand, input);
+        add_job(jobs, pid, line, ampersand, input);
     } else if (pid == 0) {
         execvp(input[0], input);
-//        remove_job(jobs, pid); //TODO find correct place to remove job
         fprintf(stderr, "Execution error\n");
     } else if (pid < 0) {
         perror("Forking unsuccessful\n");
@@ -258,7 +272,7 @@ bool help(char **args, struct job_t *jobs) {
  * @return true if success, false if fail.
  */
 bool shell_exit(char **args, struct job_t *jobs) {
-//    kill_all(jobs);
+    kill_all(jobs);
     return false;
 }
 
@@ -270,10 +284,12 @@ bool shell_exit(char **args, struct job_t *jobs) {
  */
 bool list_jobs(char **args, struct job_t *jobs) {
     register int i;
+    int status;
     for (i = 0; i < MAX_JOBS; i++) {
-        if (jobs[i].pid != 0) {
-            printf("%d\t\t%s\n", jobs[i].pid, jobs[i].cmd[0]);
-            //TODO currently only print the name of the command without arguments
+        if (jobs[i].pid != 0 && waitpid(jobs[i].pid, &status, WNOHANG) == 0) {
+            printf("%d\t\t%s\n", jobs[i].pid, jobs[i].line);
+        } else if (jobs[i].pid != 0 && waitpid(jobs[i].pid, &status, WNOHANG) != 0) {
+            remove_job(jobs, jobs[i].pid);
         }
     }
     return true;
@@ -287,14 +303,24 @@ bool list_jobs(char **args, struct job_t *jobs) {
  * @param state state of the job, foreground or background.
  * @param cmd commandline argument of the job.
  */
-void add_job(struct job_t *jobs, pid_t pid, int jid, state state, char **cmd) {
+void add_job(struct job_t *jobs, pid_t pid, char *line, state state, char **cmd) {
+    static int jid = 1;
     int i;
     register int j;
     size_t size = 0;
     for (i = 0; i < MAX_JOBS; i++) {
         if (jobs[i].pid == 0) {
             jobs[i].pid = pid;
-            jobs[i].jid = jid;
+            jobs[i].jid = jid++;
+            if (jobs[i].state == background) {
+                line[strlen(line) - 1] = '\0';
+            }
+            jobs[i].line = calloc(strlen(line), sizeof(char));
+            if (!jobs[i].line) {
+                printf("Allocation error!\n");
+                exit(-1);
+            }
+            strcpy(jobs[i].line, line);
             jobs[i].state = state;
             for (j = 0; cmd[j] != NULL; j++) {
                 for (int k = 0; cmd[j][k] != '\0'; k++) {
@@ -302,7 +328,7 @@ void add_job(struct job_t *jobs, pid_t pid, int jid, state state, char **cmd) {
                 }
             }
             jobs[i].cmd = calloc(size, sizeof(char));
-            memcpy(jobs[i].cmd, cmd, sizeof(char) * size);
+            memcpy(jobs[i].cmd, cmd, size * sizeof(char));
             break;
         }
     }
@@ -318,6 +344,7 @@ void remove_job(struct job_t *jobs, pid_t pid) {
     for (i = 0; i < MAX_JOBS; i++) {
         if (jobs[i].pid == pid) {
             free(jobs[i].cmd);
+            free(jobs[i].line);
             memset(&jobs[i], '\0', sizeof(struct job_t));
         }
     }
