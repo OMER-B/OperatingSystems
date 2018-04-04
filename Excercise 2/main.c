@@ -162,7 +162,7 @@ bool start(struct job_t *jobs, struct job_t job) {
     }
     if (job.state == foreground && pid != 0) {
         waitpid(pid, NULL, 0);
-        remove_job(jobs, job); //TODO find correct place to remove job (this place is good for foregrounds)
+        remove_job(jobs, job);
     }
     return true;
 }
