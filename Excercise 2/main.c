@@ -14,6 +14,7 @@
 
 typedef enum state { foreground, background } state;
 typedef enum bool { false, true } bool;
+
 void parse_line(char **, char *);
 state check_ampersand(char *);
 
@@ -274,6 +275,7 @@ void remove_job(struct job_t *jobs, struct job_t job) {
  */
 void kill_all(struct job_t *jobs) {
     register int i;
+    int status;
     for (i = 0; i < MAX_JOBS; i++) {
         kill(jobs[i].pid, 0);
     }
