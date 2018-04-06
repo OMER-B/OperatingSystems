@@ -156,7 +156,8 @@ bool start(struct job_t *jobs, struct job_t job) {
         add_job(jobs, job);
     } else if (pid == 0) {
         execvp(job.cmd[0], job.cmd);
-        fprintf(stderr, "Execution error.\n");
+        fprintf(stderr, "Error in system call");
+
     } else if (pid < 0) {
         perror("Forking unsuccessful.\n");
         return false;
@@ -275,7 +276,6 @@ void remove_job(struct job_t *jobs, struct job_t job) {
  */
 void kill_all(struct job_t *jobs) {
     register int i;
-    int status;
     for (i = 0; i < MAX_JOBS; i++) {
         kill(jobs[i].pid, 0);
     }
