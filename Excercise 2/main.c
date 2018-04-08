@@ -6,11 +6,11 @@
 
 /* Util declarations */
 #define MAX_JOBS 512
-#define MAX_ARGS 10
-#define MAX_ARGS_LEN 50
+#define MAX_ARGS 20
+#define MAX_ARGS_LEN 512
 #define MAX_LINE MAX_ARGS*MAX_ARGS_LEN
 #define PROMPT "prompt> "
-#define DELIMITER " "
+#define DELIMITER " \""
 
 typedef enum state { foreground, background } state;
 typedef enum bool { false, true } bool;
@@ -176,6 +176,7 @@ bool start(struct job_t *jobs, struct job_t job) {
  * @return true if success, false if fail.
  */
 bool cd(struct job_t *jobs, struct job_t job) {
+    printf("%d\n", getpid());
     if (job.cmd[1] == NULL) {
         chdir(getenv("HOME"));
         return true;
