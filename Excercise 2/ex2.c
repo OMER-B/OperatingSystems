@@ -127,7 +127,7 @@ void parse_line(char **cmd, char *line) {
         c = (unsigned char) *p;
         switch (state) {
             case DULL:
-                if (isspace(c)) {
+                if (c == ' ') {
                     continue;
                 }
 
@@ -150,7 +150,7 @@ void parse_line(char **cmd, char *line) {
                 continue;
 
             case IN_WORD:
-                if (isspace(c)) {
+                if (c == ' ') {
                     *p = 0;
                     cmd[position++] = start_of_word;
                     state = DULL;
