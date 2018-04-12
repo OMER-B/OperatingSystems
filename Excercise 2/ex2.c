@@ -3,6 +3,7 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 /* Util declarations */
 #define MAX_JOBS 512
@@ -12,10 +13,15 @@
 #define PROMPT "prompt> "
 #define DELIMITER " \""
 
-typedef enum state { foreground, background } state;
-typedef enum bool { false, true } bool;
+typedef enum state {
+    foreground, background
+} state;
+typedef enum bool {
+    false, true
+} bool;
 
 void parse_line(char **, char *);
+
 state check_ampersand(char *);
 
 /* Jobs handling */
@@ -28,16 +34,24 @@ struct job_t {
 };
 
 struct job_t setup_job(char *);
+
 void kill_all(struct job_t *);
+
 void remove_job(struct job_t *, struct job_t);
+
 void add_job(struct job_t *, struct job_t);
 
 /* Commands */
 bool start(struct job_t *, struct job_t);
+
 bool execute(struct job_t *, struct job_t);
+
 bool help(struct job_t *, struct job_t);
+
 bool cd(struct job_t *, struct job_t);
+
 bool list_jobs(struct job_t *, struct job_t);
+
 bool shell_exit(struct job_t *, struct job_t);
 
 /* Implementations */
@@ -91,14 +105,61 @@ struct job_t setup_job(char *line) {
  * @param cmd where to put the args.
  * @param line input from user.
  */
-void parse_line(char **cmd, char *line) {
-    int i = 0;
-    char *token = strtok(line, DELIMITER);
+//void parse_line(char **cmd, char *line) {
+//    int i = 0;
+//    char *token = strtok(line, DELIMITER);
+//
+//    while (token != NULL) {
+//        cmd[i++] = token;
+//        token = strtok(NULL, DELIMITER);
+//    }
+//}
 
-    while (token != NULL) {
-        cmd[i++] = token;
-        token = strtok(NULL, DELIMITER);
+void parse_line(char **cmd, char *line) {
+    char *p, *start_of_word;
+    int c;
+    enum states {
+        DULL, IN_WORD, IN_STRING
+    } state = DULL;
+    size_t position = 0;
+
+    for (p = line; position < MAX_ARGS && *p != '\0'; p++) {
+        c = (unsigned char) *p;
+        switch (state) {
+            case DULL:
+                if (isspace(c)) {
+                    continue;
+                }
+
+                if (c == '\"') {
+                    state = IN_STRING;
+                    start_of_word = p + 1;
+                    continue;
+                }
+                state = IN_WORD;
+                start_of_word = p;
+                continue;
+
+            case IN_STRING:
+                if (c == '\"') {
+                    *p = 0;
+                    cmd[position++] = start_of_word;
+                    state = DULL;
+                }
+                continue;
+
+            case IN_WORD:
+                if (isspace(c)) {
+                    *p = 0;
+                    cmd[position++] = start_of_word;
+                    state = DULL;
+                }
+                continue;
+        }
     }
+
+    if (state != DULL && position < MAX_ARGS)
+        cmd[position++] = start_of_word;
 }
 
 /**
@@ -120,7 +181,6 @@ bool execute(struct job_t *jobs, struct job_t job) {
     char *commands[] = {"cd", "help", "jobs", "exit"};
 
     size = sizeof(commands) / sizeof(char *);
-
     for (i = 0; i < size; i++) {
         if (!strcmp(job.cmd[0], commands[i])) {
             return (*func[i])(jobs, job);
@@ -156,8 +216,7 @@ bool start(struct job_t *jobs, struct job_t job) {
         add_job(jobs, job);
     } else if (pid == 0) {
         execvp(job.cmd[0], job.cmd);
-        fprintf(stderr, "Error in system call");
-
+        fprintf(stderr, "Error in system call\n");
     } else if (pid < 0) {
         perror("Forking unsuccessful.\n");
         return false;
@@ -176,13 +235,25 @@ bool start(struct job_t *jobs, struct job_t job) {
  * @return true if success, false if fail.
  */
 bool cd(struct job_t *jobs, struct job_t job) {
+    int success;
+    static char prev_dir[1024] = "";
     printf("%d\n", getpid());
-    if (job.cmd[1] == NULL) {
-        chdir(getenv("HOME"));
+    if (job.cmd[1] == NULL || !strcmp(job.cmd[1], "~")) {
+        getcwd(prev_dir, sizeof(prev_dir));
+        success = chdir(getenv("HOME"));
+        return true;
+    } else if (!strcmp(job.cmd[1], "-")) {
+        char pwd[1024];
+        getcwd(pwd, sizeof(prev_dir));
+        success = chdir(prev_dir);
+        if (!success)
+            printf("%s\n", prev_dir);
+        strcpy(prev_dir, pwd);
         return true;
     } else {
+        getcwd(prev_dir, sizeof(prev_dir));
         if (chdir(job.cmd[1]) == -1) {
-            printf("%s: No such directory.\n", job.cmd[1]);
+            fprintf(stderr, "No such directory %s\n", job.cmd[1]);
             return true;
         }
     }
