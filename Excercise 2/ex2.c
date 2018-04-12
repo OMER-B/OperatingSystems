@@ -136,6 +136,7 @@ void parse_line(char **cmd, char *line) {
                     start_of_word = p + 1;
                     continue;
                 }
+
                 state = IN_WORD;
                 start_of_word = p;
                 continue;
