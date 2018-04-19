@@ -65,8 +65,8 @@ ssize_t file_to_buffer(char *path, char **file_buffer) {
   char temp_buffer[BUFFER_SIZE];
   bzero(temp_buffer, BUFFER_SIZE * sizeof(char));
   int file_descriptor;
-  ssize_t file_len = 0;
-  ssize_t num_bytes_read;
+  register ssize_t file_len = 0;
+  register ssize_t num_bytes_read;
 
   file_descriptor = open(path, O_RDONLY);
   check_sys_call(file_descriptor);
@@ -97,19 +97,18 @@ ssize_t file_to_buffer(char *path, char **file_buffer) {
  * Check if allocation is successful in different function because code got messy.
  * @param allocated allocated pointer.
  */
-void check_allocation(void *allocated) {
+inline void check_allocation(void *allocated) {
   if (!allocated) {
     printf(ALLOCATION_FAILURE);
     exit(-1);
   }
-
 }
 
 /**
  * Check system call failure in different function because code got messy.
  * @param fd File descriptor.
  */
-void check_sys_call(ssize_t fd) {
+inline void check_sys_call(ssize_t fd) {
   if (fd < 0) {
     fprintf(stderr, SYS_CALL_ERROR);
     exit(-1);
@@ -142,27 +141,30 @@ bool identical(const char *file1, const char *file2, ssize_t max_len) {
  * @return True if files are similar, false otherwise.
  */
 bool similar(const char *file1, const char *file2, ssize_t max_len) {
+  char a[max_len], b[max_len];
   register int i = 0;
   register int j = 0;
-  bool flag = false;
+
+  for (i = 0, j = 0; i < max_len; i++) {
+    if (file1[i] == '\n' || file1[i] == ' ' || file1[i] == '\t') {
+      continue;
+    }
+    a[j++] = file1[i];
+  }
+  for (i = 0, j = 0; i < max_len; i++) {
+    if (file2[i] == '\n' || file2[i] == ' ' || file2[i] == '\t') {
+      continue;
+    }
+    b[j++] = file2[i];
+  }
+
   for (i = 0, j = 0; i < max_len && j < max_len; i++, j++) {
-    if (file1[i] != file2[j]) {
-      flag = false;
-      if (file1[i] == file2[j] + 32 || file1[i] + 32 == file2[j]) {
-        flag = true;
-        continue;
-      }
-      if (file1[i] == '\n' || file1[i] == ' ' || file1[i] == '\t') {
-        --j;
-        continue;
-      } else if (file2[j] == '\n' || file2[j] == ' ' || file2[j] == '\t') {
-        --i;
+    if (a[i] != b[j]) {
+      if (a[i] == b[j] + 32 || a[i] + 32 == b[j]) {
         continue;
       }
       return false;
-    } else {
-      flag = true;
     }
   }
-  return flag;
+  return true;
 }
