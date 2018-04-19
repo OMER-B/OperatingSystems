@@ -17,6 +17,8 @@ typedef enum diff { INVALID, DIFFERENT, SIMILAR, IDENTICAL } diff;
 bool identical(const char *, const char *, ssize_t);
 bool similar(const char *, const char *, ssize_t);
 ssize_t file_to_buffer(char *, char **);
+void check_sys_call(ssize_t);
+void check_allocation(void *);
 
 int main(int arc, char *argv[]) {
   if (!argv[1] || !argv[2]) { // Check if no argument is given.
@@ -28,8 +30,8 @@ int main(int arc, char *argv[]) {
   char *file2_buffer = NULL;
 
   // Load files to heap.
-  file1_len = file_to_buffer(argv[1], &file1_buffer);
-  file2_len = file_to_buffer(argv[2], &file2_buffer);
+  file1_len = file_to_buffer("/home/omer/CLionProjects/untitled8/fir", &file1_buffer);
+  file2_len = file_to_buffer("/home/omer/CLionProjects/untitled8/sec", &file2_buffer);
 
   max_len = MAX(file1_len, file2_len);
 
@@ -67,41 +69,51 @@ ssize_t file_to_buffer(char *path, char **file_buffer) {
   ssize_t num_bytes_read;
 
   file_descriptor = open(path, O_RDONLY);
-  if (file_descriptor < 0) {
-    fprintf(stderr, SYS_CALL_ERROR);
-    exit(-1);
-  }
-
-  num_bytes_read = read(file_descriptor, temp_buffer, BUFFER_SIZE * sizeof(char)); // read entire file
-  file_len = num_bytes_read;
-  *file_buffer = (char *) malloc((num_bytes_read) * sizeof(char));
-  if (!*file_buffer) {
-    printf(ALLOCATION_FAILURE);
-    exit(-1);
-  }
-  strcpy(*file_buffer, temp_buffer);
+  check_sys_call(file_descriptor);
   num_bytes_read = read(file_descriptor, temp_buffer, BUFFER_SIZE * sizeof(char));
+  file_len = num_bytes_read;
+  *file_buffer = (char *) malloc((num_bytes_read + 1) * sizeof(char));
+  check_allocation(*file_buffer);
+  strcpy(*file_buffer, temp_buffer);
+
+  num_bytes_read = read(file_descriptor, temp_buffer, BUFFER_SIZE * sizeof(char));
+
   while (num_bytes_read) {
     file_len = +num_bytes_read;
-    if (num_bytes_read < 0) {
-      fprintf(stderr, SYS_CALL_ERROR);
-      exit(-1);
-    }
+    check_sys_call(num_bytes_read);
     *file_buffer = (char *) realloc(*file_buffer, num_bytes_read * sizeof(char));
-    if (!*file_buffer) {
-      printf(ALLOCATION_FAILURE);
-      exit(-1);
-    }
+    check_allocation(*file_buffer);
     strcat(*file_buffer, temp_buffer);
     num_bytes_read = read(file_descriptor, temp_buffer, BUFFER_SIZE * sizeof(char));
   }
 
   num_bytes_read = close(file_descriptor);
-  if (num_bytes_read < 0) {
+  check_sys_call(num_bytes_read);
+
+  return file_len;
+}
+
+/**
+ * Check if allocation is successful in different function because code got messy.
+ * @param allocated allocated pointer.
+ */
+void check_allocation(void *allocated) {
+  if (!allocated) {
+    printf(ALLOCATION_FAILURE);
+    exit(-1);
+  }
+
+}
+
+/**
+ * Check system call failure in different function because code got messy.
+ * @param fd File descriptor.
+ */
+void check_sys_call(ssize_t fd) {
+  if (fd < 0) {
     fprintf(stderr, SYS_CALL_ERROR);
     exit(-1);
   }
-  return file_len;
 }
 
 /**
