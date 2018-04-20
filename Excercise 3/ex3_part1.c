@@ -11,11 +11,14 @@
 #define ALLOCATION_FAILURE "Allocation failure.\n"
 #define SYS_CALL_ERROR "Error in system call"
 
+const int spaces[] = {' ', '\t', '\n', '\r', '\f'};
+
 typedef enum bool { false, true } bool;
 typedef enum diff { INVALID, DIFFERENT, SIMILAR, IDENTICAL } diff;
 
 bool identical(const char *, const char *, ssize_t);
 bool similar(const char *, const char *, ssize_t);
+bool is_space(int);
 ssize_t file_to_buffer(char *, char **);
 void check_sys_call(ssize_t);
 void check_allocation(void *);
@@ -146,13 +149,13 @@ bool similar(const char *file1, const char *file2, ssize_t max_len) {
   register int j = 0;
 
   for (i = 0, j = 0; i < max_len; i++) {
-    if (file1[i] == '\n' || file1[i] == ' ' || file1[i] == '\t') {
+    if (is_space(file1[i])) {
       continue;
     }
     a[j++] = file1[i];
   }
   for (i = 0, j = 0; i < max_len; i++) {
-    if (file2[i] == '\n' || file2[i] == ' ' || file2[i] == '\t') {
+    if (is_space(file2[i])) {
       continue;
     }
     b[j++] = file2[i];
@@ -167,4 +170,15 @@ bool similar(const char *file1, const char *file2, ssize_t max_len) {
     }
   }
   return true;
+}
+
+inline bool is_space(int c) {
+  register int i = 0;
+  size_t num_of_spaces = sizeof(spaces) / sizeof(int);
+  for (i = 0; i < num_of_spaces; i++) {
+    if (c == spaces[i]) {
+      return true;
+    }
+  }
+  return false;
 }
