@@ -8,17 +8,18 @@
 
 #define MAX(a, b) a>(b)?(a):b
 #define BUFFER_SIZE 128
+#define CASE_DIFF 32
 #define ALLOCATION_FAILURE "Allocation failure.\n"
 #define SYS_CALL_ERROR "Error in system call"
 
-const int spaces[] = {' ', '\t', '\n', '\r', '\f'};
+const char spaces[] = {' ', '\t', '\n', '\r', '\f'};
 
 typedef enum bool { false, true } bool;
 typedef enum diff { INVALID, DIFFERENT, SIMILAR, IDENTICAL } diff;
 
 bool identical(const char *, const char *, ssize_t);
 bool similar(const char *, const char *, ssize_t);
-bool is_space(int);
+bool is_space(char);
 ssize_t file_to_buffer(char *, char **);
 void check_sys_call(ssize_t);
 void check_allocation(void *);
@@ -113,7 +114,8 @@ inline void check_allocation(void *allocated) {
  */
 inline void check_sys_call(ssize_t fd) {
   if (fd < 0) {
-    fprintf(stderr, SYS_CALL_ERROR);
+    size_t len = strlen(SYS_CALL_ERROR);
+    write(stderr, SYS_CALL_ERROR, len);
     exit(-1);
   }
 }
@@ -145,6 +147,8 @@ bool identical(const char *file1, const char *file2, ssize_t max_len) {
  */
 bool similar(const char *file1, const char *file2, ssize_t max_len) {
   char a[max_len], b[max_len];
+  bzero(a, (size_t) max_len);
+  bzero(b, (size_t) max_len);
   register int i = 0;
   register int j = 0;
 
@@ -163,7 +167,7 @@ bool similar(const char *file1, const char *file2, ssize_t max_len) {
 
   for (i = 0, j = 0; i < max_len && j < max_len; i++, j++) {
     if (a[i] != b[j]) {
-      if (a[i] == b[j] + 32 || a[i] + 32 == b[j]) {
+      if (a[i] == b[j] + CASE_DIFF || a[i] + CASE_DIFF == b[j]) {
         continue;
       }
       return false;
@@ -172,9 +176,14 @@ bool similar(const char *file1, const char *file2, ssize_t max_len) {
   return true;
 }
 
-inline bool is_space(int c) {
+/**
+ * Checks if a char is space.
+ * @param c Char to check
+ * @return True if char is space, false otherwise.
+ */
+inline bool is_space(char c) {
   register int i = 0;
-  size_t num_of_spaces = sizeof(spaces) / sizeof(int);
+  size_t num_of_spaces = sizeof(spaces) / sizeof(char);
   for (i = 0; i < num_of_spaces; i++) {
     if (c == spaces[i]) {
       return true;
