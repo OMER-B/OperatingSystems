@@ -115,7 +115,7 @@ inline void check_allocation(void *allocated) {
 inline void check_sys_call(ssize_t fd) {
   if (fd < 0) {
     size_t len = strlen(SYS_CALL_ERROR);
-    write(stderr, SYS_CALL_ERROR, len);
+    write(2, SYS_CALL_ERROR, len);
     exit(-1);
   }
 }
