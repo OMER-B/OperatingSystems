@@ -1,3 +1,6 @@
+/* Omer Barak *
+ * 313264053  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -34,8 +37,8 @@ int main(int arc, char *argv[]) {
   char *file2_buffer = NULL;
 
   // Load files to heap.
-  file1_len = file_to_buffer("/home/omer/CLionProjects/untitled8/fir", &file1_buffer);
-  file2_len = file_to_buffer("/home/omer/CLionProjects/untitled8/sec", &file2_buffer);
+  file1_len = file_to_buffer(argv[1], &file1_buffer);
+  file2_len = file_to_buffer(argv[2], &file2_buffer);
 
   max_len = MAX(file1_len, file2_len);
 
