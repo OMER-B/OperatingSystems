@@ -5,10 +5,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <ctype.h>
 
 #define MAX(a, b) a>(b)?(a):b
 #define BUFFER_SIZE 128
-#define CASE_DIFF 32
 #define ALLOCATION_FAILURE "Allocation failure.\n"
 #define SYS_CALL_ERROR "Error in system call"
 
@@ -34,8 +34,8 @@ int main(int arc, char *argv[]) {
   char *file2_buffer = NULL;
 
   // Load files to heap.
-  file1_len = file_to_buffer(argv[1], &file1_buffer);
-  file2_len = file_to_buffer(argv[2], &file2_buffer);
+  file1_len = file_to_buffer("/home/omer/CLionProjects/untitled8/fir", &file1_buffer);
+  file2_len = file_to_buffer("/home/omer/CLionProjects/untitled8/sec", &file2_buffer);
 
   max_len = MAX(file1_len, file2_len);
 
@@ -67,25 +67,26 @@ int main(int arc, char *argv[]) {
  */
 ssize_t file_to_buffer(char *path, char **file_buffer) {
   char temp_buffer[BUFFER_SIZE];
-  bzero(temp_buffer, BUFFER_SIZE * sizeof(char));
+  memset(temp_buffer, '\0', BUFFER_SIZE * sizeof(char));
   int file_descriptor;
   register ssize_t file_len = 0;
   register ssize_t num_bytes_read;
-
+  register ssize_t to_alloc = BUFFER_SIZE;
   file_descriptor = open(path, O_RDONLY);
   check_sys_call(file_descriptor);
   num_bytes_read = read(file_descriptor, temp_buffer, BUFFER_SIZE * sizeof(char));
   file_len = num_bytes_read;
-  *file_buffer = (char *) malloc((num_bytes_read + 1) * sizeof(char));
+  to_alloc += file_len;
+  *file_buffer = (char *) calloc((num_bytes_read), sizeof(char));
   check_allocation(*file_buffer);
   strcpy(*file_buffer, temp_buffer);
 
-  num_bytes_read = read(file_descriptor, temp_buffer, BUFFER_SIZE * sizeof(char));
-
+  num_bytes_read = read(file_descriptor, temp_buffer, (BUFFER_SIZE) * sizeof(char));
   while (num_bytes_read) {
-    file_len = +num_bytes_read;
+    to_alloc += num_bytes_read;
+    file_len += num_bytes_read;
     check_sys_call(num_bytes_read);
-    *file_buffer = (char *) realloc(*file_buffer, num_bytes_read * sizeof(char));
+    *file_buffer = (char *) realloc(*file_buffer, (to_alloc) * sizeof(char));
     check_allocation(*file_buffer);
     strcat(*file_buffer, temp_buffer);
     num_bytes_read = read(file_descriptor, temp_buffer, BUFFER_SIZE * sizeof(char));
@@ -102,7 +103,7 @@ ssize_t file_to_buffer(char *path, char **file_buffer) {
  * @param allocated allocated pointer.
  */
 inline void check_allocation(void *allocated) {
-  if (!allocated) {
+  if (allocated == NULL) {
     printf(ALLOCATION_FAILURE);
     exit(-1);
   }
@@ -139,7 +140,6 @@ bool identical(const char *file1, const char *file2, ssize_t max_len) {
 
 /**
  * Checks if two buffers (containing the content of the files) are similar.
- * Currently uses flag. Maybe will change when have time.
  * @param file1 First buffer to compare
  * @param file2 Second buffer to compare
  * @param max_len Length of the larger buffer
@@ -147,29 +147,35 @@ bool identical(const char *file1, const char *file2, ssize_t max_len) {
  */
 bool similar(const char *file1, const char *file2, ssize_t max_len) {
   char a[max_len], b[max_len];
-  bzero(a, (size_t) max_len);
-  bzero(b, (size_t) max_len);
+  memset(a, '\0', (size_t) max_len);
+  memset(b, '\0', (size_t) max_len);
+
   register int i = 0;
   register int j = 0;
 
+  // Copy file1 to a
   for (i = 0, j = 0; i < max_len; i++) {
+    if (file1[i] == 0) {
+      break;
+    }
     if (is_space(file1[i])) {
       continue;
     }
-    a[j++] = file1[i];
+    a[j++] = (char) tolower(file1[i]);
   }
+  // Copy file2 to b
   for (i = 0, j = 0; i < max_len; i++) {
+    if (file2[i] == 0) {
+      break;
+    }
     if (is_space(file2[i])) {
       continue;
     }
-    b[j++] = file2[i];
+    b[j++] = (char) tolower(file2[i]);
   }
-
+  // Compare
   for (i = 0, j = 0; i < max_len && j < max_len; i++, j++) {
     if (a[i] != b[j]) {
-      if (a[i] == b[j] + CASE_DIFF || a[i] + CASE_DIFF == b[j]) {
-        continue;
-      }
       return false;
     }
   }
