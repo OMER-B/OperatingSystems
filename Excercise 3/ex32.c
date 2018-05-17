@@ -12,7 +12,7 @@
 #define COMPILE_GCC     "gcc"
 #define MAX_LENGTH      160
 #define NUM_OF_LINES    3
-#define OUT_FILE        "user.out"
+#define OUT_FILE        "./user.out"
 
 typedef enum bool { false, true } bool;
 typedef enum reason { NO_C_FILE, COMPILATION_ERROR, TIMEOUT, BAD_OUTPUT, SIMILAR_OUTPUT, GREAT_JOB, TBD } reason;
@@ -37,7 +37,7 @@ typedef struct Config {
 
 void error();
 void compile(Student);
-void grade(Student *, int);
+void grade(Student *, int, Config);
 
 void parse_config(char *, Config *);
 
@@ -54,8 +54,8 @@ void save_to_CVS(Student student) {
 }
 bool check_for_out();
 
-reason compare();
-void grade(Student *students, int num_of_students) {
+reason compare(Config config);
+void grade(Student *students, int num_of_students, Config config) {
   int i = 0;
   bool has_out;
   while (i < num_of_students) {
@@ -66,15 +66,33 @@ void grade(Student *students, int num_of_students) {
         students[i++].reason = COMPILATION_ERROR;
         continue;
       }
+      students[i].reason = compare(config);
       unlink(OUT_FILE);
-      students[i].reason = compare();
     }
     i++;
   }
 }
 
-reason compare() {
-  return TBD;
+reason compare(Config config) {
+  char *args[] = {OUT_FILE, OUT_FILE, NULL};
+  int success;
+  int in, out;
+  in = open("output.txt", STDIN_FILENO);
+  out = open(config.input_file, STDOUT_FILENO);
+  dup2(in, 0);
+  dup2(out, 1);
+
+  pid_t pid = fork();
+  if (pid == 0) {
+    success = execvp(args[0], args);
+    if (success == 0) {
+      error();
+    }
+  } else {
+    waitpid(pid, NULL, 0);
+  }
+  close(in);
+  close(out);
 }
 
 void compile(Student student) {
@@ -83,8 +101,7 @@ void compile(Student student) {
   pid_t pid;
   pid = fork();
   if (pid == 0) {
-
-    success = execvp(COMPILE_GCC, args);
+    success = execvp(args[0], args);
     if (success == 0) {
       error();
     }
@@ -173,7 +190,7 @@ int main(int argc, char *argv[]) {
 
   /* Compile students' files */
 
-  grade(students, num_of_students);
+  grade(students, num_of_students, config);
 
   print(students, num_of_students);
   free(students);
@@ -261,17 +278,17 @@ Student *check_directories(char *location, int *num_of_students) {
 }
 
 void print(Student *student, int num_of_students) {
-  puts("┌───┬──────────────────────────────┬────────┬──────────┬────────────────────┐");
-  printf("│%-3s│%-30s│%-8s│%-10s│%-20s│\n", "ID", "NAME", "REASON", "GRADE", "REASON");
-  for (int i = 0; i < num_of_students; i++) {
-    puts("├───┼──────────────────────────────┼────────┼──────────┼────────────────────┤");
-
-    printf("│%-3d│%-30s│%-8d│%-10d│%-20s│\n",
-           i,
-           student[i].folder_name,
-           student[i].reason,
-           grade_arr[student[i].reason], reason_arr[student[i].reason]);
-  }
-
-  puts("└───┴──────────────────────────────┴────────┴──────────┴────────────────────┘");
+//  puts("┌───┬──────────────────────────────┬────────┬──────────┬────────────────────┐");
+//  printf("│%-3s│%-30s│%-8s│%-10s│%-20s│\n", "ID", "NAME", "REASON", "GRADE", "REASON");
+//  for (int i = 0; i < num_of_students; i++) {
+//    puts("├───┼──────────────────────────────┼────────┼──────────┼────────────────────┤");
+//
+//    printf("│%-3d│%-30s│%-8d│%-10d│%-20s│\n",
+//           i,
+//           student[i].folder_name,
+//           student[i].reason,
+//           grade_arr[student[i].reason], reason_arr[student[i].reason]);
+//  }
+//
+//  puts("└───┴──────────────────────────────┴────────┴──────────┴────────────────────┘");
 }
