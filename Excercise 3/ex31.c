@@ -27,7 +27,7 @@ ssize_t file_to_buffer(char *, char **);
 void check_sys_call(ssize_t);
 void check_allocation(void *);
 
-int main(int arc, char *argv[]) {
+int main(int argc, char *argv[]) {
   if (!argv[1] || !argv[2]) { // Check if no argument is given.
     return INVALID;
   }
