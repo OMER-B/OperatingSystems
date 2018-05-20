@@ -1,6 +1,3 @@
-/* Omer Barak *
- * 313264053  */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
