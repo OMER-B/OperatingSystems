@@ -21,7 +21,7 @@
 #define DOT_OUT_FILE    "./user.out"
 #define DOT_COMP_FILE   "./comp.out"
 #define DOT_OUTPUT_FILE "./output.txt"
-#define DOT_RESULT_FILE "./result.csv"
+#define DOT_RESULT_FILE "./results.csv"
 
 const char
     *reason_arr[] = {"NO_C_FILE", "COMPILATION_ERROR", "TIMEOUT", "BAD_OUTPUT", "SIMILAR_OUTPUT", "GREAT_JOB", "TBD"};
