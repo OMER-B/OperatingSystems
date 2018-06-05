@@ -18,7 +18,7 @@ ThreadPool *tpCreate(int numOfThreads) {
     // Initialize all fields
     pool->state = ONLINE;
     pool->pool_size = numOfThreads;
-    pool->queue = osCreateQueue();;
+    pool->queue = osCreateQueue();
     if (pthread_mutex_init(&pool->mutex, NULL) != 0)
         error();
 
@@ -91,6 +91,8 @@ void tpDestroy(ThreadPool *pool, int shouldWaitForTasks) {
     for (i = 0; i < pool->pool_size; i++)
         pthread_join(pool->threads[i], NULL); // Join all threads
 
+    while (!osIsQueueEmpty(pool->queue))
+        free(osDequeue(pool->queue));
     free(pool->threads);
     osDestroyQueue(pool->queue);
     pthread_mutex_destroy(&pool->mutex);
